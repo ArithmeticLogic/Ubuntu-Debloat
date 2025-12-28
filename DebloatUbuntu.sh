@@ -71,14 +71,14 @@ esac
 # --------------------------------------------------
 # CORE INSTALLS
 # --------------------------------------------------
-read -p "Install Nemo, Librewolf, htop, fastfetch, gnome-tweaks (Y/n) " core_confirm
+read -p "Install Nemo, Librewolf, htop, gnome-tweaks (Y/n) " core_confirm
 case $core_confirm in
   [nN]* )
     echo "Skipping core installs."
     ;;
   * )
     echo "Installing core utilities..."
-    apt install -y nemo htop fastfetch extrepo gnome-tweaks software-properties-common
+    apt install -y nemo htop extrepo gnome-tweaks software-properties-common
 
     echo "Enabling Librewolf repository and installing..."
     extrepo enable librewolf
@@ -90,7 +90,7 @@ esac
 # --------------------------------------------------
 # MEDIA APPLICATIONS
 # --------------------------------------------------
-read -p "Install media apps (GIMP, Kdenlive, OBS, Audacity)? (Y/n) " media_confirm
+read -p "Install media apps (GIMP, Kdenlive, OBS, Audacity) (Y/n) " media_confirm
 case $media_confirm in
   [nN]* )
     echo "Skipping media apps."
@@ -109,7 +109,7 @@ esac
 # --------------------------------------------------
 # DEVELOPER / PERSONAL TOOLS
 # --------------------------------------------------
-read -p "Install PSensor and TradingView? (Y/n) " dev_confirm
+read -p "Install PSensor, TradingView, Mullvad VPN (Y/n) " dev_confirm
 case $dev_confirm in
   [nN]* )
     echo "Skipping developer/personal tools."
@@ -151,6 +151,7 @@ esac
 # CLEANUP AND SYSTEM UPDATE
 # --------------------------------------------------
 echo "Cleaning up unnecessary packages..."
+apt remove yelp
 apt autoremove -y
 apt clean
 
