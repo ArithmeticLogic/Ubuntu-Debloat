@@ -1,187 +1,188 @@
-#!/bin/sh
+#!/usr/bin/env bash
+set -e
 
-# Check if the script is being run as root
-if [ "$(whoami)" != "root" ]; then
+# --------------------------------------------------
+# ROOT CHECK
+# --------------------------------------------------
+if [ "$(id -u)" != "0" ]; then
     echo "Please run this script as root."
     exit 1
 fi
 
-# Information message
-printf "This script will:\n\n- Remove Snap and Snap-related services\n- Remove the GNOME Help app (yelp)\n- Remove the default Ubuntu file manager (nautilus)\n- Remove Cheese (Camera app)\n- Remove gnome-software (App Manager)\n- Remove gnome-system-monitor (System Monitor)\n- Install Nemo file manager\n- Install Librewolf browser\n- Install htop (system monitor)\n- Install fastfetch (system info)\n\n"
-printf "Additionally, you can choose to install media-related applications in the Media section:\n\n- Install GIMP (image editor)\n- Install Kdenlive (video editor)\n- Install OBS Studio (streaming/recording software)\n- Install Audacity (audio editor)\n\n"
-printf "You can also choose to install Developer Personal tools:\n\n- Mullvad VPN (privacy tool)\n- PSensor (temperature monitor)\n- TradingView (stock and crypto charting)\n"
-
-# Prompt to continue
-read -p "Do you want to proceed with removing Snap, GNOME Help, Nautilus, Cheese, gnome-software, and gnome-system-monitor? (Y/n) " remove_confirm
-case $remove_confirm in
-  [nN] | [nN][oO] )
-    echo "Skipping removal of Snap, GNOME Help, Nautilus, Cheese, gnome-software, and gnome-system-monitor."
+# --------------------------------------------------
+# REMOVE SNAP (OPTIONAL, PERMANENT)
+# --------------------------------------------------
+read -p "Do you want to remove Snap from your system? (Y/n) " remove_snap
+case $remove_snap in
+  [nN]* )
+    echo "Skipping Snap removal."
     ;;
-  "" | [yY] | [yY][eE][sS] )
-    # --- REMOVE SECTION ---
-    # Disable and remove Snap services
-    echo "Disabling Snap-related services..."
-    systemctl disable snapd.service
-    systemctl disable snapd.socket
-    systemctl disable snapd.seeded.service
+  * )
+    echo "Removing Snap..."
 
-    # Remove Snap packages
-    echo "Removing Snap packages..."
-    snap remove --purge $(snap list | awk '!/^Name/ {print $1}')
     rm -rf /var/cache/snapd/
-    rm -rf ~/snap
+    apt autoremove --purge -y snapd gnome-software-plugin-snap
+    rm -rf /home/*/snap
+    rm -rf /root/snap
 
-    # Prevent Snap from being reinstalled
-    echo "Preventing Snap from being reinstalled..."
-    printf "Package: snapd\nPin: release a=*\nPin-Priority: -10" > /etc/apt/preferences.d/nosnap.pref
+    echo "Blocking Snap from being reinstalled..."
 
-    # Remove GNOME Help (yelp)
-    echo "Removing GNOME Help (yelp)..."
-    apt remove --purge yelp -y
+    # Prevent snapd from ever being installed again
+    apt-mark hold snapd gnome-software-plugin-snap
 
-    # Remove the default file manager (nautilus)
-    echo "Removing default file manager (nautilus)..."
-    apt remove --purge nautilus -y
+    cat << 'EOF' > /etc/apt/preferences.d/nosnap.pref
+Package: snapd
+Pin: release a=*
+Pin-Priority: -10
+EOF
 
-    # Remove Cheese (Camera app)
-    echo "Removing Cheese (Camera app)..."
-    apt remove --purge cheese -y
+    # Disable any remaining snap services (defensive)
+    systemctl disable --now snapd.service snapd.socket snapd.seeded.service 2>/dev/null || true
 
-    # Remove gnome-software (App Manager)
-    echo "Removing gnome-software (App Manager)..."
-    apt remove --purge gnome-software -y
-
-    # Remove gnome-system-monitor (System Monitor)
-    echo "Removing gnome-system-monitor (System Monitor)..."
-    apt remove --purge gnome-system-monitor -y
-  ;;
+    echo "Snap removal complete and permanently blocked."
+    ;;
 esac
 
-# Prompt to continue with installing Nemo, Librewolf, htop, fastfetch
-read -p "Do you want to proceed with installing Nemo, Librewolf, htop, and fastfetch? (Y/n) " install_confirm
-case $install_confirm in
-  [nN] | [nN][oO] )
-    echo "Skipping installation of Nemo, Librewolf, htop, and fastfetch."
+# --------------------------------------------------
+# SCRIPT HEADER / SUMMARY
+# --------------------------------------------------
+printf "\nUbuntu Setup Script - Sections Included:\n"
+printf "Remove GNOME components • Core Installs (Nemo, Librewolf, htop, fastfetch, gnome-tweaks) • Media Apps (GIMP, Kdenlive, OBS, Audacity) • Developer/Personal Tools (PSensor, TradingView)\n\n"
+
+# --------------------------------------------------
+# REMOVE GNOME COMPONENTS
+# --------------------------------------------------
+read -p "Proceed with removing GNOME components? (Y/n) " remove_confirm
+case $remove_confirm in
+  [nN]* )
+    echo "Skipping GNOME component removal."
     ;;
-  "" | [yY] | [yY][eE][sS] )
-    # --- INSTALL SECTION ---
-    # Install Nemo file manager
-    echo "Installing Nemo file manager..."
-    apt install nemo -y
+  * )
+    echo "Removing GNOME components..."
+    apt remove --purge -y \
+      yelp \
+      nautilus \
+      cheese \
+      gnome-software \
+      gnome-system-monitor
+    ;;
+esac
 
-    # Set Nemo as the default file manager
-    echo "Setting Nemo as the default file manager..."
-    xdg-mime default nemo.desktop inode/directory application/x-gnome-saved-search
+# --------------------------------------------------
+# CORE INSTALLS
+# --------------------------------------------------
+read -p "Install Nemo, Librewolf, htop, fastfetch, gnome-tweaks (Y/n) " core_confirm
+case $core_confirm in
+  [nN]* )
+    echo "Skipping core installs."
+    ;;
+  * )
+    echo "Installing core utilities..."
+    apt install -y nemo htop fastfetch extrepo gnome-tweaks software-properties-common
 
-    # Install Librewolf browser
-    echo "Installing Librewolf browser..."
-    apt install extrepo -y
-
-    # Enable Librewolf repository
+    echo "Enabling Librewolf repository and installing..."
     extrepo enable librewolf
-
-    # Install Librewolf
-    apt install librewolf -y
-
-    # Set Librewolf as the default browser
-    echo "Setting Librewolf as the default browser..."
-    xdg-settings set default-web-browser librewolf.desktop
-
-    # Install htop (system monitor)
-    echo "Installing htop (system monitor)..."
-    apt install htop -y
-
-    # Install fastfetch (system info)
-    echo "Installing fastfetch (system info)..."
-    apt install fastfetch -y
-  ;;
+    apt update
+    apt install -y librewolf
+    ;;
 esac
 
-# --- MEDIA SECTION ---
-# Prompt to continue with installing media-related applications (e.g., GIMP, Kdenlive, OBS Studio, Audacity)
-read -p "Do you want to proceed with installing media-related applications (e.g., GIMP, Kdenlive, OBS Studio, Audacity)? (Y/n) " media_confirm
+# --------------------------------------------------
+# MEDIA APPLICATIONS
+# --------------------------------------------------
+read -p "Install media apps (GIMP, Kdenlive, OBS, Audacity)? (Y/n) " media_confirm
 case $media_confirm in
-  [nN] | [nN][oO] )
-    echo "Skipping installation of media-related applications."
+  [nN]* )
+    echo "Skipping media apps."
     ;;
-  "" | [yY] | [yY][eE][sS] )
-    # Install GIMP (image editor)
-    echo "Installing GIMP (image editor)..."
-    apt install gimp -y
+  * )
+    echo "Installing GIMP, OBS, Audacity..."
+    apt install -y gimp obs-studio audacity
 
-    # Install Kdenlive (video editor) from the official PPA
-    echo "Installing Kdenlive (video editor)..."
-    add-apt-repository ppa:kdenlive/kdenlive-stable -y
-    apt update -y
-    apt install kdenlive -y
-
-    # Install OBS Studio (streaming/recording software) from Ubuntu's default repositories
-    echo "Installing OBS Studio (streaming/recording software) from the default Ubuntu repositories..."
-    apt install obs-studio -y
-
-    # Install Audacity (audio editor) from Ubuntu's official repository
-    echo "Installing Audacity (audio editor)..."
-    apt install audacity -y
-  ;;
+    echo "Installing Kdenlive via PPA..."
+    add-apt-repository -y ppa:kdenlive/kdenlive-stable
+    apt update
+    apt install -y kdenlive
+    ;;
 esac
 
-# --- DEVELOPER PERSONAL SECTION ---
-# [Potential Update] Could potentially add visual studio code and intellij idea community in this section
-# Prompt to continue with installing PSensor, VirtualBox, and TradingView
-read -p "Do you want to proceed with installing PSensor, VirtualBox, and TradingView? (Y/n) " dev_personal_confirm
-case $dev_personal_confirm in
-  [nN] | [nN][oO] )
-    echo "Skipping installation of PSensor, VirtualBox, and TradingView."
+# --------------------------------------------------
+# DEVELOPER / PERSONAL TOOLS
+# --------------------------------------------------
+read -p "Install PSensor and TradingView? (Y/n) " dev_confirm
+case $dev_confirm in
+  [nN]* )
+    echo "Skipping developer/personal tools."
     ;;
-  "" | [yY] | [yY][eE][sS] )
-    # Install PSensor (hardware temperature monitor)
+  * )
     echo "Installing PSensor..."
-    apt install psensor -y
+    apt install -y psensor wget curl
 
-    # Install VirtualBox (via Oracle repository)
-    echo "Installing VirtualBox..."
+    echo "Installing TradingView via APT..."
+    wget -qO- https://tvd-packages.tradingview.com/keyring.gpg \
+      | tee /usr/share/keyrings/tradingview-desktop-archive-keyring.gpg >/dev/null
 
-    # Add the Oracle VirtualBox repository to the sources list
-    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/oracle-virtualbox-2016.gpg] https://download.virtualbox.org/virtualbox/debian <mydist> contrib" | tee -a /etc/apt/sources.list.d/virtualbox.list
+    echo "Adding TradingView repository..."
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/tradingview-desktop-archive-keyring.gpg] \
+https://tvd-packages.tradingview.com/ubuntu/stable jammy multiverse" \
+      > /etc/apt/sources.list.d/tradingview-desktop.list
 
-    # Download and install the Oracle public key for VirtualBox
-    wget -O- https://www.virtualbox.org/download/oracle_vbox_2016.asc | gpg --yes --output /usr/share/keyrings/oracle-virtualbox-2016.gpg --dearmor
+    apt update
+    apt install -y tradingview
 
-    # Update package cache and install VirtualBox
-    apt update -y
-    apt install virtualbox-7.1 -y
+    # --------------------------------------------------
+    # MULLVAD VPN INSTALLATION
+    # --------------------------------------------------
+    echo "Downloading Mullvad signing key..."
+    curl -fsSLo /usr/share/keyrings/mullvad-keyring.asc https://repository.mullvad.net/deb/mullvad-keyring.asc
 
-    # Install TradingView
-    echo "Installing TradingView..."
+    echo "Adding Mullvad repository to APT..."
+    echo "deb [signed-by=/usr/share/keyrings/mullvad-keyring.asc arch=$(dpkg --print-architecture)] https://repository.mullvad.net/deb/stable stable main" | tee /etc/apt/sources.list.d/mullvad.list
 
-    # Download and install the TradingView public signing key
-    wget -O - https://tvd-packages.tradingview.com/keyring.gpg | tee /usr/share/keyrings/tradingview-desktop-archive-keyring.gpg >/dev/null
+    echo "Updating package list and installing Mullvad VPN..."
+    apt update
+    apt install -y mullvad-vpn
 
-    # Add the TradingView repository to the sources list
-    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/tradingview-desktop-archive-keyring.gpg] https://tvd-packages.tradingview.com/ubuntu/stable jammy multiverse" | tee /etc/apt/sources.list.d/tradingview-desktop.list >/dev/null
-
-    # Update the package list and install TradingView
-    apt update -y
-    apt install tradingview -y
-  ;;
+    echo "Mullvad VPN installation complete."
+    ;;
 esac
 
-# Clean up unnecessary packages and cache
-echo "Cleaning up unnecessary packages and cache..."
+# --------------------------------------------------
+# CLEANUP AND SYSTEM UPDATE
+# --------------------------------------------------
+echo "Cleaning up unnecessary packages..."
 apt autoremove -y
 apt clean
 
-# Update package lists and upgrade system
-echo "Updating and upgrading system..."
-apt update -y
+echo "Updating system..."
+apt update
 apt upgrade -y
 apt dist-upgrade -y
 
-# Reboot prompt
+# --------------------------------------------------
+# OPTIONAL / MANUAL TODO LIST
+# --------------------------------------------------
+echo ""
+echo "=================================================="
+echo "Manual post-install TODO items:"
+echo ""
+echo " - Install Papirus icon theme"
+echo " - Install VirtualBox"
+echo " - Install Visual Studio Code"
+echo " - Install IntelliJ IDEA"
+echo ""
+echo "These steps are intentionally not automated."
+echo "=================================================="
+
+# --------------------------------------------------
+# REBOOT PROMPT
+# --------------------------------------------------
 read -p "Reboot now? (Y/n) " reboot_prompt
 case $reboot_prompt in
   "" | [yY] | [yY][eE][sS] )
     reboot
-  ;;
+    ;;
+  * )
+    echo "Reboot skipped."
+    ;;
 esac
-
