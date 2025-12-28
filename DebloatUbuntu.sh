@@ -79,6 +79,7 @@ case $core_confirm in
   * )
     echo "Installing core utilities..."
     apt install -y nemo htop extrepo gnome-tweaks software-properties-common
+    xdg-mime default nemo.desktop inode/directory application/x-gnome-saved-search
 
     echo "Enabling Librewolf repository and installing..."
     extrepo enable librewolf
